@@ -97,7 +97,7 @@ src/
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/gamearena.git
+git clone https://github.com/puranjay369/gamearena.git
 cd gamearena
 
 # Install dependencies
