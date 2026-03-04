@@ -1,4 +1,4 @@
-# 🎮 GameArena — Online Multiplayer Gaming Platform
+# GameArena — Online Multiplayer Gaming Platform
 
 A modern, real-time 2-player gaming platform built with React. Play classic board games against a bot, locally with a friend, or online (coming soon).
 
@@ -8,7 +8,7 @@ A modern, real-time 2-player gaming platform built with React. Play classic boar
 
 ---
 
-## 🕹️ Games
+## Games
 
 | Game | Description | Bot AI |
 |------|-------------|--------|
@@ -16,24 +16,24 @@ A modern, real-time 2-player gaming platform built with React. Play classic boar
 | **Battleship** | Ship placement phase + hunt-and-target gameplay | Hunt-and-target AI with adjacency chasing |
 | **Connect Four** | Classic 7×6 drop-disc game | Minimax (depth 5) with alpha-beta pruning |
 
-## 🎯 Game Modes
+## Game Modes
 
 - **vs Bot** — Play against AI instantly, no waiting
 - **Local 2 Player** — Pass-and-play on the same device
 - **Online 2 Player** — *(Coming soon)* Real-time multiplayer via Socket.io
 
-## ✨ Features
+## Features
 
-- 🎨 Dark-themed UI with custom design tokens
-- 🔐 Local authentication (localStorage-based)
-- 📱 Fully responsive — works on mobile, tablet, and desktop
-- 🏠 Dashboard with game lobby, room creation, and profile
-- 🖼️ Custom game logos and branding
-- ⚡ Fast builds with Vite 7
+- Dark-themed UI with custom design tokens
+- Local authentication (localStorage-based)
+- Fully responsive — works on mobile, tablet, and desktop
+- Dashboard with game lobby, room creation, and profile
+- Custom game logos and branding
+- Fast builds with Vite 7
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -47,7 +47,7 @@ A modern, real-time 2-player gaming platform built with React. Play classic boar
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 src/
@@ -86,7 +86,7 @@ src/
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -97,7 +97,7 @@ src/
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/gamearena.git
+git clone https://github.com/puranjay369/gamearena.git
 cd gamearena
 
 # Install dependencies
@@ -118,7 +118,7 @@ npm run preview
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [ ] **Socket.io backend** — Real-time online 2-player multiplayer
 - [ ] **Matchmaking** — Auto-pair with random opponents
@@ -131,6 +131,6 @@ npm run preview
 
 ---
 
-## 📄 License
+## License
 
 This project is for personal/educational use.
