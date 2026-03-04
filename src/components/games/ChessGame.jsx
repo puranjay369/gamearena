@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
-import { RotateCcw, Bot, Users, Trophy } from 'lucide-react';
+import { RotateCcw, Bot, Users, Trophy, Flag } from 'lucide-react';
 
 // Simple bot: evaluates moves with piece values + positional bonus
 const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
@@ -100,12 +100,21 @@ export default function ChessGame() {
   const checkGameOver = useCallback((g) => {
     if (g.isCheckmate()) {
       setGameOver({ type: 'checkmate', winner: g.turn() === 'w' ? 'Black' : 'White' });
-    } else if (g.isDraw()) {
-      setGameOver({ type: 'draw', winner: null });
     } else if (g.isStalemate()) {
       setGameOver({ type: 'stalemate', winner: null });
+    } else if (g.isThreefoldRepetition()) {
+      setGameOver({ type: 'threefold', winner: null });
+    } else if (g.isInsufficientMaterial()) {
+      setGameOver({ type: 'insufficient', winner: null });
+    } else if (g.isDraw()) {
+      setGameOver({ type: 'draw', winner: null });
     }
   }, []);
+
+  function handleResign() {
+    const winner = game.turn() === 'w' ? 'Black' : 'White';
+    setGameOver({ type: 'resign', winner });
+  }
 
   // Bot move effect — use ref to prevent cleanup from clearing the timeout
   useEffect(() => {
@@ -232,6 +241,15 @@ export default function ChessGame() {
 
       {/* Controls */}
       <div className="flex items-center gap-2">
+        {!gameOver && (
+          <button
+            onClick={handleResign}
+            className="flex items-center gap-1.5 text-xs bg-danger/10 hover:bg-danger/20 text-danger px-3 py-1.5 rounded-lg border border-danger/30 transition-all cursor-pointer"
+          >
+            <Flag className="w-3.5 h-3.5" />
+            Resign
+          </button>
+        )}
         <button
           onClick={resetGame}
           className="flex items-center gap-1.5 text-xs bg-card hover:bg-edge text-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-edge/50 transition-all cursor-pointer"
@@ -264,10 +282,18 @@ export default function ChessGame() {
           <div className="bg-surface-alt border border-edge rounded-2xl p-6 text-center shadow-2xl max-w-xs mx-4">
             <Trophy className="w-10 h-10 text-warning mx-auto mb-3" />
             <h3 className="text-xl font-bold text-foreground mb-1">
-              {gameOver.type === 'checkmate' ? 'Checkmate!' : gameOver.type === 'stalemate' ? 'Stalemate!' : 'Draw!'}
+              {gameOver.type === 'checkmate' ? 'Checkmate!' 
+                : gameOver.type === 'stalemate' ? 'Stalemate!' 
+                : gameOver.type === 'resign' ? 'Resigned!'
+
+                : gameOver.type === 'threefold' ? 'Threefold Repetition!'
+                : gameOver.type === 'insufficient' ? 'Insufficient Material!'
+                : 'Draw!'}
             </h3>
             <p className="text-sm text-muted mb-4">
-              {gameOver.winner ? `${gameOver.winner} wins!` : 'The game is a draw.'}
+              {gameOver.winner 
+                ? `${gameOver.winner} wins${gameOver.type === 'resign' ? ' by resignation' : gameOver.type === 'timeout' ? ' on time' : ''}!` 
+                : 'The game is a draw.'}
             </p>
             <div className="flex gap-2 justify-center">
               <button
