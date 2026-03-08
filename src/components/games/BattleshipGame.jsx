@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { RotateCcw, Bot, Users, Trophy, Crosshair, Shuffle, RotateCw, Anchor } from 'lucide-react';
+import useGameStats from '../../hooks/useGameStats';
 
 const GRID = 10;
 const EMPTY = 0;
@@ -316,6 +317,20 @@ export default function BattleshipGame() {
   const botThinkingRef = useRef(false);
   const botHitsRef = useRef([]);
   const botTimerRef = useRef(null);
+  const { recordResult } = useGameStats();
+  const resultRecorded = useRef(false);
+
+  // Record game result when game ends
+  useEffect(() => {
+    if (!gameOver || resultRecorded.current) return;
+    resultRecorded.current = true;
+    if (vsBot) {
+      const result = gameOver.winner === 1 ? 'win' : 'loss';
+      recordResult('battleship', result);
+    } else {
+      recordResult('battleship', 'win', `Player ${gameOver.winner} wins`);
+    }
+  }, [gameOver, vsBot, recordResult]);
 
   function selectMode(bot) {
     setVsBot(bot);
@@ -506,6 +521,7 @@ export default function BattleshipGame() {
     setBotThinking(false);
     botHitsRef.current = [];
     botTimerRef.current = null;
+    resultRecorded.current = false;
   }
 
   function backToMenu() {

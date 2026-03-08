@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { RotateCcw, Bot, Users, Trophy } from 'lucide-react';
+import useGameStats from '../../hooks/useGameStats';
 
 const ROWS = 6;
 const COLS = 7;
@@ -143,6 +144,24 @@ export default function ConnectFourGame() {
   const [botThinking, setBotThinking] = useState(false);
   const [hoverCol, setHoverCol] = useState(null);
   const botThinkingRef = useRef(false);
+  const { recordResult } = useGameStats();
+  const resultRecorded = useRef(false);
+
+  // Record game result when game ends
+  useEffect(() => {
+    if (!gameOver || resultRecorded.current) return;
+    resultRecorded.current = true;
+    if (gameOver.winner) {
+      if (vsBot) {
+        const result = gameOver.winner === PLAYER1 ? 'win' : 'loss';
+        recordResult('connectfour', result);
+      } else {
+        recordResult('connectfour', 'win', `${gameOver.winner === PLAYER1 ? 'Red' : 'Yellow'} wins`);
+      }
+    } else {
+      recordResult('connectfour', 'draw');
+    }
+  }, [gameOver, vsBot, recordResult]);
 
   const handleDrop = useCallback(
     (col) => {
@@ -199,6 +218,7 @@ export default function ConnectFourGame() {
     setGameOver(null);
     botThinkingRef.current = false;
     setBotThinking(false);
+    resultRecorded.current = false;
   }
 
   function backToMenu() {

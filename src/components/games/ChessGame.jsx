@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { RotateCcw, Bot, Users, Trophy, Flag } from 'lucide-react';
+import useGameStats from '../../hooks/useGameStats';
 
 // Simple bot: evaluates moves with piece values + positional bonus
 const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
@@ -80,8 +81,27 @@ export default function ChessGame() {
   const [boardWidth, setBoardWidth] = useState(380);
   const botThinkingRef = useRef(false);
   const boardContainerRef = useRef(null);
+  const { recordResult } = useGameStats();
+  const resultRecorded = useRef(false);
 
   const turn = game.turn() === 'w' ? 'White' : 'Black';
+
+  // Record game result when game ends
+  useEffect(() => {
+    if (!gameOver || resultRecorded.current) return;
+    resultRecorded.current = true;
+    if (gameOver.winner) {
+      // In bot mode: White = player, Black = bot
+      if (vsBot) {
+        const result = gameOver.winner === 'White' ? 'win' : 'loss';
+        recordResult('chess', result, gameOver.type);
+      } else {
+        recordResult('chess', 'win', `${gameOver.winner} wins — ${gameOver.type}`);
+      }
+    } else {
+      recordResult('chess', 'draw', gameOver.type);
+    }
+  }, [gameOver, vsBot, recordResult]);
 
   // Resize board to fit container
   useEffect(() => {
@@ -170,6 +190,7 @@ export default function ChessGame() {
     setMoveHistory([]);
     botThinkingRef.current = false;
     setBotThinking(false);
+    resultRecorded.current = false;
   }
 
   function backToMenu() {
