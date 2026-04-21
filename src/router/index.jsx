@@ -35,7 +35,7 @@ const router = createBrowserRouter([
     ],
   },
   // Room lobby — protected
-  { path: '/room/:gameId', element: <ProtectedRoute><RoomLobbyPage /></ProtectedRoute> },
+  { path: '/room/:roomCode', element: <ProtectedRoute><RoomLobbyPage /></ProtectedRoute> },
   // Game screen — protected
   {
     element: <ProtectedRoute><GameLayout /></ProtectedRoute>,

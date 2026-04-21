@@ -1,9 +1,11 @@
 import { User, Trophy, Gamepad2, Clock, TrendingUp, TrendingDown, Minus, History } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import useGameStats from '../hooks/useGameStats';
+import { formatNameWithGuestBadge } from '../utils/guestIdentity';
 
 const GAME_LABELS = { chess: 'Chess', connectfour: 'Connect Four', battleship: 'Battleship' };
 const RESULT_COLORS = { win: 'text-success', loss: 'text-danger', draw: 'text-warning' };
+const MODE_LABELS = { multiplayer: 'Online Match', bot: 'Bot Match', local: 'Local Match' };
 
 function formatDate(iso) {
   if (!iso) return '—';
@@ -49,8 +51,10 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <h2 className="text-xl font-bold text-foreground">{user?.displayName || 'Player'}</h2>
-          <p className="text-sm text-muted">{user?.email}</p>
+          <h2 className="text-xl font-bold text-foreground">
+            {formatNameWithGuestBadge(user?.displayName || 'Player', user?.uid)}
+          </h2>
+          <p className="text-sm text-muted">{user?.isGuest ? 'Guest account' : user?.email}</p>
 
           {/* Overall stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
@@ -116,6 +120,9 @@ export default function ProfilePage() {
                     {entry.result}
                   </span>
                   <span className="text-foreground font-medium">{GAME_LABELS[entry.game] || entry.game}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-accent/90 bg-accent/10 border border-accent/20 rounded px-1.5 py-0.5">
+                    {MODE_LABELS[entry.mode] || 'Match'}
+                  </span>
                   {entry.detail && <span className="text-muted">— {entry.detail}</span>}
                   <span className="ml-auto text-muted whitespace-nowrap">{formatHistoryDate(entry.date)}</span>
                 </div>

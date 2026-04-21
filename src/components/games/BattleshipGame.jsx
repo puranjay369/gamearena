@@ -326,9 +326,9 @@ export default function BattleshipGame() {
     resultRecorded.current = true;
     if (vsBot) {
       const result = gameOver.winner === 1 ? 'win' : 'loss';
-      recordResult('battleship', result);
+      recordResult('battleship', result, null, 'bot');
     } else {
-      recordResult('battleship', 'win', `Player ${gameOver.winner} wins`);
+      recordResult('battleship', 'win', `Player ${gameOver.winner} wins`, 'local');
     }
   }, [gameOver, vsBot, recordResult]);
 

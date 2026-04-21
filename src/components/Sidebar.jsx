@@ -21,11 +21,11 @@ const navItems = [
 export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { signOut } = useAuth();
 
   const handleLogout = async () => {
     onClose();
-    await logout();
+    await signOut();
     navigate('/');
   };
 

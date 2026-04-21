@@ -1,21 +1,15 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-
-const AUTH_STORAGE_KEY = 'gamearena_user';
-const USERS_STORAGE_KEY = 'gamearena_users';
-
-function getStoredUsers() {
-  try {
-    return JSON.parse(localStorage.getItem(USERS_STORAGE_KEY)) || [];
-  } catch {
-    return [];
-  }
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-}
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+} from 'firebase/auth';
+import { auth, googleProvider } from '../firebase.js';
 
 const AuthContext = createContext(null);
+const GUEST_STORAGE_KEY = 'gamearena_guest_user';
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
@@ -23,82 +17,189 @@ export function useAuth() {
   return ctx;
 }
 
+function isEmailPasswordUser(firebaseUser) {
+  const providers = Array.isArray(firebaseUser?.providerData)
+    ? firebaseUser.providerData.map((provider) => provider?.providerId)
+    : [];
+  return providers.includes('password');
+}
+
+function normalizeUser(firebaseUser, options = {}) {
+  if (!firebaseUser) return null;
+
+  const { forceEmailDisplayName = false } = options;
+  const preferEmailDisplayName = forceEmailDisplayName || isEmailPasswordUser(firebaseUser);
+
+  const fallbackName =
+    (preferEmailDisplayName ? firebaseUser.email : firebaseUser.displayName) ||
+    firebaseUser.displayName ||
+    firebaseUser.email ||
+    `Player-${String(firebaseUser.uid || '').slice(0, 6)}`;
+
+  return {
+    uid: firebaseUser.uid,
+    email: firebaseUser.email,
+    displayName: fallbackName,
+    photoURL: firebaseUser.photoURL || null,
+    createdAt: firebaseUser.metadata?.creationTime || null,
+    isGuest: false,
+  };
+}
+
+function getRandomToken(length = 10) {
+  const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const bytes = new Uint8Array(length);
+
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+
+  let token = '';
+  for (let i = 0; i < length; i += 1) {
+    token += alphabet[bytes[i] % alphabet.length];
+  }
+
+  return token;
+}
+
+function createGuestUser() {
+  const randomId = getRandomToken(12);
+  const shortId = randomId.slice(0, 4).toUpperCase();
+
+  return {
+    uid: `guest_${randomId}`,
+    displayName: `Guest_${shortId}`,
+    isGuest: true,
+    email: null,
+    photoURL: null,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function isValidGuestUser(value) {
+  if (!value || typeof value !== 'object') return false;
+  if (typeof value.uid !== 'string' || !value.uid.startsWith('guest_')) return false;
+  if (typeof value.displayName !== 'string' || !value.displayName.trim()) return false;
+  return true;
+}
+
+function getStoredGuestUser() {
+  try {
+    const raw = localStorage.getItem(GUEST_STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!isValidGuestUser(parsed)) {
+      localStorage.removeItem(GUEST_STORAGE_KEY);
+      return null;
+    }
+
+    return {
+      ...parsed,
+      isGuest: true,
+      email: null,
+      photoURL: null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function setStoredGuestUser(guestUser) {
+  try {
+    localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(guestUser));
+  } catch {
+    // Ignore storage errors to avoid breaking login flow.
+  }
+}
+
+function clearStoredGuestUser() {
+  try {
+    localStorage.removeItem(GUEST_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors to avoid breaking logout flow.
+  }
+}
+
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore session on mount
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY));
-      if (stored) setUser(stored);
-    } catch { /* ignore */ }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        clearStoredGuestUser();
+        setUser(normalizeUser(firebaseUser));
+        setLoading(false);
+        return;
+      }
+
+      setUser(getStoredGuestUser());
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  function persistUser(u) {
-    setUser(u);
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(u));
+  async function signInWithGoogle() {
+    const result = await signInWithPopup(auth, googleProvider);
+    clearStoredGuestUser();
+    const normalized = normalizeUser(result.user);
+    setUser(normalized);
+    return normalized;
   }
 
-  async function signup(email, password, displayName) {
-    const users = getStoredUsers();
-    if (users.find((u) => u.email === email)) {
-      throw new Error('An account with this email already exists.');
+  async function signUpWithEmail(email, password) {
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    clearStoredGuestUser();
+    const normalized = normalizeUser(result.user, { forceEmailDisplayName: true });
+    setUser(normalized);
+    return normalized;
+  }
+
+  async function signInWithEmail(email, password) {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    clearStoredGuestUser();
+    const normalized = normalizeUser(result.user, { forceEmailDisplayName: true });
+    setUser(normalized);
+    return normalized;
+  }
+
+  async function signInAsGuest() {
+    const guestUser = createGuestUser();
+    setStoredGuestUser(guestUser);
+
+    if (auth.currentUser) {
+      await firebaseSignOut(auth);
     }
-    if (password.length < 6) {
-      throw new Error('Password must be at least 6 characters.');
+
+    setUser(guestUser);
+    return guestUser;
+  }
+
+  async function signOut() {
+    if (user?.isGuest) {
+      clearStoredGuestUser();
+      setUser(null);
+      return;
     }
-    const newUser = {
-      uid: crypto.randomUUID(),
-      email,
-      displayName: displayName || email.split('@')[0],
-      photoURL: null,
-      createdAt: new Date().toISOString(),
-    };
-    saveUsers([...users, { ...newUser, password }]);
-    persistUser(newUser);
-    return newUser;
+
+    await firebaseSignOut(auth);
   }
 
-  async function login(email, password) {
-    const users = getStoredUsers();
-    const found = users.find((u) => u.email === email && u.password === password);
-    if (!found) {
-      throw new Error('Invalid email or password.');
-    }
-    const { password: _, ...safeUser } = found;
-    persistUser(safeUser);
-    return safeUser;
-  }
-
-  async function loginWithGoogle() {
-    // Local mock: create/login a demo Google user
-    const demoEmail = 'player@gmail.com';
-    const users = getStoredUsers();
-    let found = users.find((u) => u.email === demoEmail);
-    if (!found) {
-      found = {
-        uid: crypto.randomUUID(),
-        email: demoEmail,
-        displayName: 'Player',
-        photoURL: null,
-        password: '__google__',
-        createdAt: new Date().toISOString(),
-      };
-      saveUsers([...users, found]);
-    }
-    const { password: _, ...safeUser } = found;
-    persistUser(safeUser);
-    return safeUser;
-  }
-
-  async function logout() {
-    setUser(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-  }
-
-  const value = { user, loading, loginWithGoogle, signup, login, logout };
+  const value = useMemo(() => ({
+    user,
+    loading,
+    signInWithGoogle,
+    signUpWithEmail,
+    signInWithEmail,
+    signInAsGuest,
+    signOut,
+  }), [user, loading]);
 
   return (
     <AuthContext.Provider value={value}>

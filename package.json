@@ -7,16 +7,20 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "npm --prefix server run dev",
+    "server:start": "npm --prefix server run start"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
     "chess.js": "^1.4.0",
+    "firebase": "^12.11.0",
     "lucide-react": "^0.564.0",
     "react": "^19.2.0",
     "react-chessboard": "^5.10.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
+    "socket.io-client": "^4.8.3",
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
