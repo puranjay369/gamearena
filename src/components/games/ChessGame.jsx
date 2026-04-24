@@ -8,6 +8,13 @@ import {
   createInitialState,
   GAME_STATUS,
 } from '../../game-engines/chess';
+import {
+  checkMatchClockTimeout,
+  createMatchClock,
+  pauseMatchClock,
+  resolveClock,
+  switchMatchClockTurn,
+} from '../../utils/matchClock';
 
 const PROMOTION_OPTIONS = [
   { value: 'q', label: 'Queen' },
@@ -89,6 +96,9 @@ export default function ChessGame({
   onMoveRequest,
   localPlayer = 'w',
   roomKey = '',
+  isExternallyLocked = false,
+  onClockStateChange,
+  onMatchReset,
 }) {
   const [internalState, setInternalState] = useState(createInitialState);
   const [botThinking, setBotThinking] = useState(false);
@@ -97,8 +107,11 @@ export default function ChessGame({
   const [isSubmittingMove, setIsSubmittingMove] = useState(false);
   const [moveHistory, setMoveHistory] = useState([]);
   const [capturedPieces, setCapturedPieces] = useState({ w: [], b: [] });
+  const [clockState, setClockState] = useState(() => createMatchClock({ activePlayer: 1, nowMs: Date.now() }));
+  const [clockNowMs, setClockNowMs] = useState(Date.now());
   const fallbackStateRef = useRef(createInitialState());
   const botThinkingRef = useRef(false);
+  const previousClockSeatRef = useRef(1);
   const submissionTimerRef = useRef(null);
   const previousFenRef = useRef('');
   const derivedPreviousFenRef = useRef('');
@@ -142,13 +155,24 @@ export default function ChessGame({
       ? !localColor || currentTurn !== localColor
       : false;
 
-  const inputLocked = gameOver || botThinking || blockedByTurn || waitingPromotion || isSubmittingMove;
+  const inputLocked = gameOver || botThinking || blockedByTurn || waitingPromotion || isSubmittingMove || isExternallyLocked;
+
+  const activeSeat = currentTurn === 'b' ? 2 : 1;
+
+  const localClockView = useMemo(() => {
+    if (mode === 'multiplayer') return null;
+    return resolveClock(clockState, clockNowMs);
+  }, [mode, clockState, clockNowMs]);
 
   const turnText = useMemo(() => {
     if (botThinking) return 'Bot is thinking...';
     if (isSubmittingMove) return 'Submitting move...';
     if (waitingPromotion) return 'Choose a promotion piece';
     if (gameOver) return '';
+
+    if (mode === 'multiplayer' && isExternallyLocked) {
+      return 'Waiting for opponent reconnection...';
+    }
 
     if (mode === 'multiplayer') {
       if (!localColor) return 'Waiting for seat assignment...';
@@ -160,7 +184,7 @@ export default function ChessGame({
     }
 
     return `${turnLabel}'s turn`;
-  }, [botThinking, isSubmittingMove, waitingPromotion, gameOver, mode, localColor, currentTurn, turnLabel, localColorLabel]);
+  }, [botThinking, isSubmittingMove, waitingPromotion, gameOver, mode, localColor, currentTurn, turnLabel, localColorLabel, isExternallyLocked]);
 
   const feedbackText = useMemo(() => {
     if (activeState.status === GAME_STATUS.WON) {
@@ -331,9 +355,63 @@ export default function ChessGame({
     }
 
     if (mode !== 'multiplayer') {
-      setInternalState(createInitialState());
+      const nextState = createInitialState();
+      setInternalState(nextState);
+      previousClockSeatRef.current = 1;
+      setClockState(createMatchClock({ activePlayer: 1, nowMs: Date.now() }));
+      setClockNowMs(Date.now());
+    } else if (onClockStateChange) {
+      onClockStateChange(null);
     }
   }, [mode, roomKey]);
+
+  useEffect(() => {
+    if (mode === 'multiplayer') return;
+
+    if (gameOver) {
+      setClockState((previous) => pauseMatchClock(previous, Date.now()));
+      return;
+    }
+
+    if (previousClockSeatRef.current !== activeSeat) {
+      previousClockSeatRef.current = activeSeat;
+      setClockState((previous) => switchMatchClockTurn(previous, activeSeat, Date.now()));
+    }
+  }, [mode, gameOver, activeSeat]);
+
+  useEffect(() => {
+    if (mode === 'multiplayer' || gameOver) return undefined;
+
+    const timer = setInterval(() => {
+      setClockNowMs(Date.now());
+    }, 250);
+
+    return () => clearInterval(timer);
+  }, [mode, gameOver]);
+
+  useEffect(() => {
+    if (mode === 'multiplayer' || gameOver) return;
+
+    const timeoutCheck = checkMatchClockTimeout(clockState, clockNowMs);
+    if (!timeoutCheck.timedOutSeat) return;
+
+    setClockState(timeoutCheck.clock);
+    setInternalState((previous) => {
+      if (previous.status !== GAME_STATUS.PLAYING) return previous;
+      return {
+        ...previous,
+        status: GAME_STATUS.WON,
+        winner: timeoutCheck.timedOutSeat === 1 ? 'b' : 'w',
+        endReason: 'clock_timeout',
+        timedOutSeat: timeoutCheck.timedOutSeat,
+      };
+    });
+  }, [mode, gameOver, clockState, clockNowMs]);
+
+  useEffect(() => {
+    if (!onClockStateChange) return;
+    onClockStateChange(localClockView);
+  }, [onClockStateChange, localClockView]);
 
   useEffect(() => {
     if (isFreshPosition) {
@@ -617,10 +695,15 @@ export default function ChessGame({
   const resetGame = useCallback(() => {
     if (mode === 'multiplayer') return;
 
-    setInternalState(createInitialState());
+    const nextState = createInitialState();
+    setInternalState(nextState);
+    previousClockSeatRef.current = 1;
+    setClockState(createMatchClock({ activePlayer: 1, nowMs: Date.now() }));
+    setClockNowMs(Date.now());
     botThinkingRef.current = false;
     setBotThinking(false);
     resultRecorded.current = false;
+    if (onMatchReset) onMatchReset();
   }, [mode]);
 
   return (

@@ -46,7 +46,11 @@ export default function RoomLobbyPage() {
 
       try {
         await joinRoom(roomCode);
-      } catch {
+      } catch (err) {
+        if (err instanceof Error && err.code === 'MATCH_EXPIRED') {
+          return;
+        }
+
         // If join fails for an existing viewer state, attempt snapshot fetch.
         if (!cancelled) {
           await fetchRoomState(roomCode).catch(() => {});

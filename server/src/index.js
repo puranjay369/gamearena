@@ -15,7 +15,12 @@ const io = new Server(httpServer, {
 });
 
 const roomStore = new RoomStore();
-const roomService = new RoomService(roomStore);
+const roomService = new RoomService(roomStore, {
+  onRoomUpdated: (snapshot) => {
+    if (!snapshot?.roomCode) return;
+    io.to(snapshot.roomCode).emit('room:state', snapshot);
+  },
+});
 
 registerSocketHandlers(io, roomService);
 

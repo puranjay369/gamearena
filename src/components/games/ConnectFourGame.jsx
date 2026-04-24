@@ -11,6 +11,13 @@ import {
   PLAYER1,
   PLAYER2,
 } from '../../game-engines/connectFour';
+import {
+  checkMatchClockTimeout,
+  createMatchClock,
+  pauseMatchClock,
+  resolveClock,
+  switchMatchClockTurn,
+} from '../../utils/matchClock';
 
 const CELL_COLORS = {
   [EMPTY]: 'bg-surface',
@@ -25,11 +32,17 @@ export default function ConnectFourGame({
   onResetRequest,
   localPlayer = PLAYER1,
   botDepth = 5,
+  isExternallyLocked = false,
+  onClockStateChange,
+  onMatchReset,
 }) {
   const [internalState, setInternalState] = useState(createInitialState);
   const [botThinking, setBotThinking] = useState(false);
   const [hoverCol, setHoverCol] = useState(null);
+  const [clockState, setClockState] = useState(() => createMatchClock({ activePlayer: PLAYER1, nowMs: Date.now() }));
+  const [clockNowMs, setClockNowMs] = useState(Date.now());
   const botThinkingRef = useRef(false);
+  const previousPlayerRef = useRef(PLAYER1);
   const { recordResult } = useGameStats();
   const resultRecorded = useRef(false);
 
@@ -46,7 +59,12 @@ export default function ConnectFourGame({
   const blockedByTurn =
     mode === 'bot' ? currentPlayer === PLAYER2 : mode === 'multiplayer' ? currentPlayer !== localPlayer : false;
 
-  const inputLocked = gameFinished || botThinking || blockedByTurn;
+  const inputLocked = gameFinished || botThinking || blockedByTurn || isExternallyLocked;
+
+  const localClockView = useMemo(() => {
+    if (mode === 'multiplayer') return null;
+    return resolveClock(clockState, clockNowMs);
+  }, [mode, clockState, clockNowMs]);
 
   const multiplayerRoleText = useMemo(() => {
     if (mode !== 'multiplayer') return '';
@@ -59,13 +77,17 @@ export default function ConnectFourGame({
     if (botThinking) return 'Bot is thinking...';
     if (gameOver) return '';
 
+    if (mode === 'multiplayer' && isExternallyLocked) {
+      return 'Waiting for opponent reconnection...';
+    }
+
     if (mode === 'multiplayer') {
       if (localPlayer !== PLAYER1 && localPlayer !== PLAYER2) return 'Waiting for players...';
       return currentPlayer === localPlayer ? 'Your Turn' : "Opponent's Turn";
     }
 
     return `${currentPlayer === PLAYER1 ? 'Red' : 'Yellow'}'s turn`;
-  }, [botThinking, gameOver, mode, localPlayer, currentPlayer]);
+  }, [botThinking, gameOver, mode, localPlayer, currentPlayer, isExternallyLocked]);
 
   // Record game result when game ends
   useEffect(() => {
@@ -89,9 +111,65 @@ export default function ConnectFourGame({
   useEffect(() => {
     resultRecorded.current = false;
     if (mode !== 'multiplayer') {
-      setInternalState(createInitialState());
+      const nextState = createInitialState();
+      setInternalState(nextState);
+      previousPlayerRef.current = nextState.currentPlayer;
+      setClockState(createMatchClock({ activePlayer: nextState.currentPlayer, nowMs: Date.now() }));
+      setClockNowMs(Date.now());
+      return;
     }
+
+    if (onClockStateChange) onClockStateChange(null);
   }, [mode]);
+
+  useEffect(() => {
+    if (mode === 'multiplayer') return;
+
+    if (gameFinished) {
+      setClockState((previous) => pauseMatchClock(previous, Date.now()));
+      return;
+    }
+
+    if (previousPlayerRef.current !== currentPlayer) {
+      previousPlayerRef.current = currentPlayer;
+      setClockState((previous) => switchMatchClockTurn(previous, currentPlayer, Date.now()));
+    }
+  }, [mode, gameFinished, currentPlayer]);
+
+  useEffect(() => {
+    if (mode === 'multiplayer' || gameFinished) return undefined;
+
+    const timer = setInterval(() => {
+      setClockNowMs(Date.now());
+    }, 250);
+
+    return () => clearInterval(timer);
+  }, [mode, gameFinished]);
+
+  useEffect(() => {
+    if (mode === 'multiplayer' || gameFinished) return;
+
+    const timeoutCheck = checkMatchClockTimeout(clockState, clockNowMs);
+    if (!timeoutCheck.timedOutSeat) return;
+
+    setClockState(timeoutCheck.clock);
+    setInternalState((previous) => {
+      if (previous.status !== GAME_STATUS.PLAYING) return previous;
+
+      return {
+        ...previous,
+        status: GAME_STATUS.WON,
+        winner: timeoutCheck.timedOutSeat === PLAYER1 ? PLAYER2 : PLAYER1,
+        endReason: 'clock_timeout',
+        timedOutSeat: timeoutCheck.timedOutSeat,
+      };
+    });
+  }, [mode, gameFinished, clockState, clockNowMs]);
+
+  useEffect(() => {
+    if (!onClockStateChange) return;
+    onClockStateChange(localClockView);
+  }, [onClockStateChange, localClockView]);
 
   const handleDrop = useCallback(
     (col) => {
@@ -142,10 +220,15 @@ export default function ConnectFourGame({
       return;
     }
 
-    setInternalState(createInitialState());
+    const nextState = createInitialState();
+    setInternalState(nextState);
+    previousPlayerRef.current = nextState.currentPlayer;
+    setClockState(createMatchClock({ activePlayer: nextState.currentPlayer, nowMs: Date.now() }));
+    setClockNowMs(Date.now());
     botThinkingRef.current = false;
     setBotThinking(false);
     resultRecorded.current = false;
+    if (onMatchReset) onMatchReset();
   }
 
   return (

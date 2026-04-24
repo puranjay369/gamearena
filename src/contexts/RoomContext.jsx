@@ -24,7 +24,9 @@ function emitWithAck(event, payload, timeoutMs = 8000) {
       clearTimeout(timeout);
 
       if (!response?.ok) {
-        reject(new Error(response?.error?.message || 'Request failed.'));
+        const error = new Error(response?.error?.message || 'Request failed.');
+        error.code = response?.error?.code || 'REQUEST_FAILED';
+        reject(error);
         return;
       }
 
@@ -46,6 +48,7 @@ export function RoomProvider({ children }) {
     user?.displayName ||
     (user?.email ? user.email.split('@')[0] : null) ||
     (user?.uid ? `Player-${String(user.uid).slice(0, 6)}` : null);
+  const avatarId = String(user?.avatarId || '').trim().toLowerCase() || 'avatar1';
 
   const requireAuth = useCallback(() => {
     if (playerId) return;
@@ -108,6 +111,7 @@ export function RoomProvider({ children }) {
       const snapshot = await emitWithAck('room:create', {
         playerId,
         displayName,
+        avatarId,
         gameId,
       });
 
@@ -122,7 +126,7 @@ export function RoomProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [playerId, displayName, requireAuth]);
+  }, [playerId, displayName, avatarId, requireAuth]);
 
   const joinRoom = useCallback(async (roomCode) => {
     const normalized = normalizeRoomCode(roomCode);
@@ -148,6 +152,7 @@ export function RoomProvider({ children }) {
         roomCode: normalized,
         playerId,
         displayName,
+        avatarId,
       });
 
       setActiveRoomCodeState(normalized);
@@ -160,7 +165,7 @@ export function RoomProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [playerId, displayName, requireAuth]);
+  }, [playerId, displayName, avatarId, requireAuth]);
 
   const startGame = useCallback(async (roomCode) => {
     const targetCode = normalizeRoomCode(roomCode || activeRoomCode);
@@ -254,6 +259,42 @@ export function RoomProvider({ children }) {
     }
   }, [activeRoomCode, room?.roomCode, requireAuth, playerId]);
 
+  const leaveRoom = useCallback(async (roomCode) => {
+    const targetCode = normalizeRoomCode(roomCode || activeRoomCode || room?.roomCode);
+    if (!targetCode) {
+      const err = new Error('Room code is required.');
+      setError(err.message);
+      throw err;
+    }
+
+    try {
+      requireAuth();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Please sign in to continue. You can use Google or Guest mode.';
+      setError(message);
+      throw err;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const snapshot = await emitWithAck('room:leave', {
+        roomCode: targetCode,
+        playerId,
+      });
+
+      setRoom(snapshot);
+      return snapshot;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to leave room.';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [activeRoomCode, room?.roomCode, requireAuth, playerId]);
+
   const clearRoomError = useCallback(() => setError(''), []);
 
   const makeMove = useCallback((moveOrColumn, roomCode) => {
@@ -310,6 +351,7 @@ export function RoomProvider({ children }) {
     startGame,
     fetchRoomState,
     requestRematch,
+    leaveRoom,
     makeMove,
     clearRoomError,
   }), [
@@ -326,6 +368,7 @@ export function RoomProvider({ children }) {
     startGame,
     fetchRoomState,
     requestRematch,
+    leaveRoom,
     makeMove,
     clearRoomError,
   ]);

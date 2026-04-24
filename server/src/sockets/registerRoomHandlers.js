@@ -44,6 +44,7 @@ export function registerRoomHandlers(io, socket, roomService) {
       const room = roomService.createRoom({
         playerId: payload.playerId,
         displayName: payload.displayName,
+        avatarId: payload.avatarId,
         gameId: payload.gameId,
         socketId: socket.id,
       });
@@ -64,6 +65,7 @@ export function registerRoomHandlers(io, socket, roomService) {
         roomCode: payload.roomCode,
         playerId: payload.playerId,
         displayName: payload.displayName,
+        avatarId: payload.avatarId,
         socketId: socket.id,
       });
 
@@ -96,6 +98,24 @@ export function registerRoomHandlers(io, socket, roomService) {
     try {
       const room = roomService.getRoom(payload.roomCode);
       safeAck(ack, { ok: true, room: roomService.serializeRoom(room) });
+    } catch (error) {
+      safeAck(ack, toAckError(error));
+    }
+  });
+
+  socket.on('room:leave', async (payload = {}, ack) => {
+    try {
+      const room = await roomService.leaveRoom({
+        roomCode: payload.roomCode,
+        playerId: payload.playerId,
+        socketId: socket.id,
+      });
+
+      socket.leave(room.roomCode);
+
+      const snapshot = roomService.serializeRoom(room);
+      io.to(room.roomCode).emit('room:state', snapshot);
+      safeAck(ack, { ok: true, room: snapshot });
     } catch (error) {
       safeAck(ack, toAckError(error));
     }
@@ -136,10 +156,11 @@ export function registerRoomHandlers(io, socket, roomService) {
   });
 
   socket.on('disconnect', () => {
-    const room = roomService.markDisconnected(socket.id);
-    if (!room) return;
+    Promise.resolve(roomService.markDisconnected(socket.id)).then((room) => {
+      if (!room) return;
 
-    const snapshot = roomService.serializeRoom(room);
-    io.to(room.roomCode).emit('room:state', snapshot);
+      const snapshot = roomService.serializeRoom(room);
+      io.to(room.roomCode).emit('room:state', snapshot);
+    }).catch(() => {});
   });
 }
