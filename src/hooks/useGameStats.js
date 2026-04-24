@@ -32,6 +32,8 @@ function normalizeMode(mode) {
 
 function normalizeResult(result) {
   const raw = String(result || '').trim().toLowerCase();
+  if (raw === 'won') return 'win';
+  if (raw === 'lost') return 'loss';
   if (raw === 'win' || raw === 'loss' || raw === 'draw') return raw;
   return null;
 }
@@ -43,6 +45,12 @@ function getResultForUser(match, uid) {
 
   const outcomeResult = normalizeResult(userOutcome?.result);
   if (outcomeResult) return outcomeResult;
+
+  const directResult = normalizeResult(match?.result);
+  if (directResult) return directResult;
+
+  const outcomeResultLegacy = normalizeResult(match?.outcome);
+  if (outcomeResultLegacy) return outcomeResultLegacy;
 
   if (match?.winner === 'draw') return 'draw';
   if (typeof match?.winner === 'string' && match.winner) {
@@ -61,7 +69,7 @@ function buildStatsFromMatches(matches, uid) {
   };
 
   for (const match of matches) {
-    const gameKey = toStatsKey(normalizeGameId(match?.gameId));
+    const gameKey = toStatsKey(normalizeGameId(match?.gameId || match?.game));
     if (!gameKey) continue;
 
     const result = getResultForUser(match, uid);
@@ -173,5 +181,18 @@ export default function useGameStats() {
       }
     : { gamesPlayed: 0, wins: 0, losses: 0, draws: 0 };
 
-  return { stats: stats || EMPTY_STATS, totals, recordResult, loading };
+  const fallbackStats = user?.stats || { wins: 0, losses: 0, draws: 0 };
+  const fallbackGamesPlayed =
+    Number(fallbackStats.wins || 0) + Number(fallbackStats.losses || 0) + Number(fallbackStats.draws || 0);
+
+  const effectiveTotals = totals.gamesPlayed > 0
+    ? totals
+    : {
+        gamesPlayed: fallbackGamesPlayed,
+        wins: Number(fallbackStats.wins || 0),
+        losses: Number(fallbackStats.losses || 0),
+        draws: Number(fallbackStats.draws || 0),
+      };
+
+  return { stats: stats || EMPTY_STATS, totals: effectiveTotals, recordResult, loading };
 }

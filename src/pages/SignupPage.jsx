@@ -5,6 +5,7 @@ import Button from '../components/Button';
 import InputField from '../components/InputField';
 import { useAuth } from '../contexts/AuthContext';
 import { formatNameWithGuestBadge } from '../utils/guestIdentity';
+import { resolveUserAvatar } from '../utils/avatarMap';
 
 function isValidEmail(email) {
   return /^\S+@\S+\.\S+$/.test(email);
@@ -113,13 +114,7 @@ export default function SignupPage() {
               {user ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-card/60 border border-edge/50">
-                    {user.photoURL ? (
-                      <img src={user.photoURL} alt={user.displayName || 'User'} className="w-11 h-11 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-11 h-11 rounded-full bg-card border border-edge/50 flex items-center justify-center">
-                        <User className="w-5 h-5 text-muted" />
-                      </div>
-                    )}
+                    <img src={resolveUserAvatar(user)} alt={user.displayName || 'User'} className="w-11 h-11 rounded-full object-cover" />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">
                         {formatNameWithGuestBadge(user.displayName, user.uid)}

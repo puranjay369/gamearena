@@ -5,6 +5,17 @@ import { User } from '../models/User.js';
 const DRAW = 'draw';
 const VALID_MODES = new Set(['multiplayer', 'bot', 'local']);
 const VALID_RESULTS = new Set(['win', 'loss', 'draw']);
+export const PRESET_AVATAR_IDS = [
+  'avatar1',
+  'avatar2',
+  'avatar3',
+  'avatar4',
+  'avatar5',
+  'avatar6',
+  'avatar7',
+  'avatar8',
+];
+const VALID_AVATAR_IDS = new Set(PRESET_AVATAR_IDS);
 
 function invertResult(result) {
   if (result === 'win') return 'loss';
@@ -71,12 +82,75 @@ async function upsertUserIdentity(uid, displayName) {
       $set: { displayName },
       $setOnInsert: {
         uid,
+        avatarId: 'avatar1',
         createdAt: new Date(),
         stats: { wins: 0, losses: 0, draws: 0 },
       },
     },
     { upsert: true }
   );
+}
+
+function normalizeAvatarId(avatarId) {
+  return String(avatarId || '').trim().toLowerCase();
+}
+
+export async function getOrCreateUserProfile({ uid, displayName }) {
+  const normalizedUid = String(uid || '').trim();
+  if (!normalizedUid) return null;
+
+  const normalizedName = String(displayName || '').trim() || 'Player';
+
+  if (!isDbConnected()) {
+    return {
+      uid: normalizedUid,
+      displayName: normalizedName,
+      avatarId: 'avatar1',
+      stats: { wins: 0, losses: 0, draws: 0 },
+    };
+  }
+
+  await upsertUserIdentity(normalizedUid, normalizedName);
+
+  const user = await User.findOne({ uid: normalizedUid }).lean();
+  if (!user) return null;
+
+  return {
+    uid: user.uid,
+    displayName: user.displayName,
+    avatarId: user.avatarId || 'avatar1',
+    stats: user.stats || { wins: 0, losses: 0, draws: 0 },
+    createdAt: user.createdAt || null,
+  };
+}
+
+export async function updateUserAvatar({ uid, avatarId, displayName }) {
+  if (!isDbConnected()) return null;
+
+  const normalizedUid = String(uid || '').trim();
+  if (!normalizedUid) return null;
+
+  const normalizedAvatarId = normalizeAvatarId(avatarId);
+  if (!VALID_AVATAR_IDS.has(normalizedAvatarId)) return null;
+
+  const normalizedName = String(displayName || '').trim() || 'Player';
+  await upsertUserIdentity(normalizedUid, normalizedName);
+
+  const updatedUser = await User.findOneAndUpdate(
+    { uid: normalizedUid },
+    { $set: { avatarId: normalizedAvatarId } },
+    { new: true }
+  ).lean();
+
+  if (!updatedUser) return null;
+
+  return {
+    uid: updatedUser.uid,
+    displayName: updatedUser.displayName,
+    avatarId: updatedUser.avatarId || 'avatar1',
+    stats: updatedUser.stats || { wins: 0, losses: 0, draws: 0 },
+    createdAt: updatedUser.createdAt || null,
+  };
 }
 
 export async function ensureUserProfile({ uid, displayName }) {
@@ -198,7 +272,15 @@ export async function getMatchesForUser(uid, limit = 50) {
 
   const cappedLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
 
-  return Match.find({ 'userOutcomes.uid': normalizedUid })
+  return Match.find({
+    $or: [
+      { 'userOutcomes.uid': normalizedUid },
+      { 'players.uid': normalizedUid },
+      { 'players.playerId': normalizedUid },
+      { uid: normalizedUid },
+      { userId: normalizedUid },
+    ],
+  })
     .sort({ finishedAt: -1, createdAt: -1 })
     .limit(cappedLimit)
     .lean();

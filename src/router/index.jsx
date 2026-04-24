@@ -3,6 +3,7 @@ import { PublicLayout, DashboardLayout, GameLayout } from '../layouts';
 import ProtectedRoute from '../components/ProtectedRoute';
 import {
   LandingPage,
+  HomePage,
   LoginPage,
   SignupPage,
   DashboardPage,
@@ -27,7 +28,7 @@ const router = createBrowserRouter([
   {
     element: <ProtectedRoute><DashboardLayout /></ProtectedRoute>,
     children: [
-      { path: '/dashboard', element: <DashboardPage /> },
+      { path: '/dashboard', element: <HomePage /> },
       { path: '/dashboard/games', element: <DashboardPage /> },
       { path: '/dashboard/create-room', element: <CreateRoomPage /> },
       { path: '/dashboard/join-room', element: <JoinRoomPage /> },

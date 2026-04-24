@@ -1,0 +1,17 @@
+<svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(120 120) rotate(90) scale(120)">
+      <stop stop-color="#60A5FA" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#60A5FA" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="120" cy="120" r="110" stroke="#3B82F6" stroke-opacity="0.28" stroke-width="2"/>
+  <circle cx="120" cy="120" r="80" fill="url(#glow)"/>
+  <path d="M82 142C66 142 56 130 54 114C52 103 58 95 68 94L86 92C91 91 96 93 100 97L110 107H130L140 97C144 93 149 91 154 92L172 94C182 95 188 103 186 114C184 130 174 142 158 142H82Z" fill="#1E293B" stroke="#64748B" stroke-width="4"/>
+  <rect x="86" y="112" width="18" height="4" rx="2" fill="#94A3B8"/>
+  <rect x="93" y="105" width="4" height="18" rx="2" fill="#94A3B8"/>
+  <circle cx="144" cy="112" r="4" fill="#60A5FA"/>
+  <circle cx="154" cy="104" r="4" fill="#A855F7"/>
+  <circle cx="164" cy="112" r="4" fill="#22D3EE"/>
+  <circle cx="154" cy="120" r="4" fill="#F59E0B"/>
+</svg>

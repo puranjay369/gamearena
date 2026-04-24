@@ -6,6 +6,7 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
+import { fetchUserProfile, saveUserAvatar } from '../api/users';
 import { auth, googleProvider } from '../firebase.js';
 
 const AuthContext = createContext(null);
@@ -41,6 +42,8 @@ function normalizeUser(firebaseUser, options = {}) {
     email: firebaseUser.email,
     displayName: fallbackName,
     photoURL: firebaseUser.photoURL || null,
+    avatarId: 'avatar1',
+    stats: { wins: 0, losses: 0, draws: 0 },
     createdAt: firebaseUser.metadata?.creationTime || null,
     isGuest: false,
   };
@@ -76,6 +79,7 @@ function createGuestUser() {
     isGuest: true,
     email: null,
     photoURL: null,
+    avatarId: 'avatar1',
     createdAt: new Date().toISOString(),
   };
 }
@@ -103,6 +107,7 @@ function getStoredGuestUser() {
       isGuest: true,
       email: null,
       photoURL: null,
+      avatarId: String(parsed.avatarId || 'avatar1').trim().toLowerCase() || 'avatar1',
     };
   } catch {
     return null;
@@ -128,6 +133,7 @@ function clearStoredGuestUser() {
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -144,6 +150,41 @@ export default function AuthProvider({ children }) {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function syncUserProfile() {
+      if (!user?.uid) return;
+
+      setProfileLoading(true);
+      try {
+        const profile = await fetchUserProfile({ uid: user.uid, displayName: user.displayName });
+        if (!active) return;
+
+        setUser((prev) => {
+          if (!prev || prev.uid !== user.uid) return prev;
+          return {
+            ...prev,
+            displayName: profile.displayName || prev.displayName,
+            avatarId: String(profile.avatarId || 'avatar1').trim().toLowerCase() || 'avatar1',
+            stats: profile.stats || prev.stats || { wins: 0, losses: 0, draws: 0 },
+            createdAt: profile.createdAt || prev.createdAt || null,
+          };
+        });
+      } catch {
+        // Keep app usable even when profile API is unavailable.
+      } finally {
+        if (active) setProfileLoading(false);
+      }
+    }
+
+    syncUserProfile();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.uid, user?.displayName]);
 
   async function signInWithGoogle() {
     const result = await signInWithPopup(auth, googleProvider);
@@ -191,15 +232,39 @@ export default function AuthProvider({ children }) {
     await firebaseSignOut(auth);
   }
 
+  async function updateAvatar(avatarId) {
+    if (!user?.uid) throw new Error('Please sign in to update avatar.');
+
+    const profile = await saveUserAvatar({
+      uid: user.uid,
+      avatarId,
+      displayName: user.displayName,
+    });
+
+    setUser((prev) => {
+      if (!prev || prev.uid !== user.uid) return prev;
+      return {
+        ...prev,
+        displayName: profile.displayName || prev.displayName,
+        avatarId: String(profile.avatarId || 'avatar1').trim().toLowerCase() || 'avatar1',
+        stats: profile.stats || prev.stats || { wins: 0, losses: 0, draws: 0 },
+        createdAt: profile.createdAt || prev.createdAt || null,
+      };
+    });
+
+    return profile;
+  }
+
   const value = useMemo(() => ({
     user,
-    loading,
+    loading: loading || profileLoading,
     signInWithGoogle,
     signUpWithEmail,
     signInWithEmail,
     signInAsGuest,
     signOut,
-  }), [user, loading]);
+    updateAvatar,
+  }), [user, loading, profileLoading]);
 
   return (
     <AuthContext.Provider value={value}>

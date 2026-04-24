@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import { CLIENT_ORIGIN } from './config.js';
 import matchRoutes from './routes/matchRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 
 function createCorsOrigin() {
   if (CLIENT_ORIGIN === '*') return true;
@@ -24,6 +25,7 @@ export function createApp() {
   });
 
   app.use('/api', matchRoutes);
+  app.use('/api', userRoutes);
 
   return app;
 }

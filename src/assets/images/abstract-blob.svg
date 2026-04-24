@@ -1,0 +1,9 @@
+<svg width="520" height="520" viewBox="0 0 520 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="blob" x1="54" y1="38" x2="452" y2="472" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#60A5FA" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#A855F7" stop-opacity="0.4"/>
+    </linearGradient>
+  </defs>
+  <path d="M425 132C474 183 490 272 457 338C424 404 343 447 260 456C176 465 90 439 54 374C17 309 30 204 82 151C133 97 225 95 302 86C379 77 401 80 425 132Z" fill="url(#blob)"/>
+</svg>

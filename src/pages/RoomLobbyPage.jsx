@@ -4,7 +4,9 @@ import { Copy, Check, Play, ArrowLeft, Share2 } from 'lucide-react';
 import Button from '../components/Button';
 import PlayerCard from '../components/PlayerCard';
 import { useRoom } from '../contexts/RoomContext';
+import { useAuth } from '../contexts/AuthContext';
 import { formatNameWithGuestBadge } from '../utils/guestIdentity';
+import { resolveUserAvatar } from '../utils/avatarMap';
 
 const GAME_NAME_MAP = {
   chess: 'Chess',
@@ -15,6 +17,7 @@ const GAME_NAME_MAP = {
 export default function RoomLobbyPage() {
   const { roomCode: roomCodeParam } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const {
@@ -180,6 +183,7 @@ export default function RoomLobbyPage() {
                   <PlayerCard
                     key={idx}
                     name={player ? `${formatNameWithGuestBadge(player.displayName, player.playerId)}${player.playerId === playerId ? ' (You)' : ''}` : null}
+                    avatar={player?.playerId === playerId ? resolveUserAvatar(user) : null}
                     isHost={player ? player.playerId === room?.hostPlayerId : false}
                     isReady={room?.status === 'active'}
                     isConnected={player ? player.connected : false}
